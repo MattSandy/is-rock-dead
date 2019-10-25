@@ -21,13 +21,12 @@ albums <- dbReadTable(db,"albums") %>%
   filter(!is.na(artist) &
            artist != "" &
            !(artist %in% c("Soundtrack", "Various Artists", "Original Cast")) &
-           !is.na(date)) %>%
-  mutate(search = map_chr(.$artist, URLencode, reserved = TRUE))
+           !is.na(date))
 #acoustic_features <- dbReadTable(db,"acoustic_features")
 dbDisconnect(db)
 
 artists <- albums %>%
-  group_by(artist, search) %>%
+  group_by(artist) %>%
   tally() %>%
   ungroup() %>% 
   arrange(desc(n))
@@ -51,16 +50,15 @@ artists_result <- readRDS("artist_result.RDS")
 
 artists_cleaned <- artists_result %>% 
   select(id = artists.id,
-         search, 
          type = artists.type,
-         name = artists.name,
+         artist = artists.name,
          tags = artists.tags,
          start_year = `artists.life-span.begin`) %>% 
   mutate(start_year = as.integer(substr(start_year, 1, 4)))
 
 albums_cleaned <- albums %>% 
   rename(album_index = id) %>% 
-  left_join(artists_cleaned %>% select(id, search, start_year, type), by = "search") %>%
+  left_join(artists_cleaned %>% select(id, artist, start_year, type), by = "artist") %>%
   mutate(date = as.Date(date),
          chart_year = year(date),
          age = chart_year - start_year) %>% 
@@ -80,11 +78,11 @@ api_user <- "diezzz_htc"
 api_key <- Sys.getenv("LASTFM_API")
 
 
-get_tags <- function(search) {
+get_tags <- function(artist) {
   api_artist_tags <- paste0(
     "https://ws.audioscrobbler.com/2.0/",
     "?method=artist.gettoptags", 
-    "&artist=", URLencode(search),
+    "&artist=", URLencode(artist),
     #"&mbid=", artist_mbid ,
     "&api_key=", api_key,
     "&format=json"
@@ -101,24 +99,16 @@ get_tags <- function(search) {
       .$tag %>%
       filter(name != "seen live") %>%
       head(5) %>%
-      mutate(search = search,
-             name = tolower(name)) %>%
+      mutate(name = tolower(name)) %>%
+      add_column(artist = artist) %>%
       select(-url)
     return(api_response)
   }
 }
+lastfm_tags <- artists$artist %>% 
+  lapply(get_tags) %>% 
+  bind_rows
 
-
-lastfm_tags <- read_csv("lastfm_tags.csv")
-
-tags_temp <- artists %>% 
-  select(search) %>% 
-  anti_join(lastfm_tags, by = "search") %>% 
-  as_vector() %>% 
-  map_dfr(get_tags)
-
-lastfm_tags <- bind_rows(lastfm_tags, tags_temp)
-remove(tags_temp)
 write_csv(lastfm_tags, "lastfm_tags.csv")
 
 top_tags <- lastfm_tags %>% 

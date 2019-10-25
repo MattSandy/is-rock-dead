@@ -12,7 +12,7 @@ lastfm_tags <- read_csv("lastfm_tags.csv")
 tags_reclass <- read_csv("tags_reclass.csv")
 
 df <- albums %>% 
-  left_join(lastfm_tags, by = "search") %>% 
+  left_join(lastfm_tags, by = "artist") %>% 
   left_join(tags_reclass, by = c("name" = "tag")) %>% 
   rename(tag = name) %>% 
   mutate(year = year(date)) %>% 
