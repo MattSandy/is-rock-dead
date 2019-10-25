@@ -84,7 +84,7 @@ get_tags <- function(search) {
   api_artist_tags <- paste0(
     "https://ws.audioscrobbler.com/2.0/",
     "?method=artist.gettoptags", 
-    "&artist=", search,
+    "&artist=", URLencode(search),
     #"&mbid=", artist_mbid ,
     "&api_key=", api_key,
     "&format=json"
